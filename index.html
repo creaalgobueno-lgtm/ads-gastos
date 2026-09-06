@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>ADS Depenses</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ADS Depenses">
+<meta name="theme-color" content="#9C4416">
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;font:16px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+     background:#F4F4F4;color:#1A1A1A;
+     padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+header{background:#9C4416;color:#fff;padding:16px;font-weight:700;font-size:18px;
+       display:flex;align-items:center;gap:10px}
+header small{font-weight:400;opacity:.85;font-size:12px;display:block}
+main{padding:16px;max-width:640px;margin:0 auto}
+.card{background:#fff;border-radius:14px;padding:16px;margin-bottom:14px;
+      box-shadow:0 1px 3px rgba(0,0,0,.12)}
+button{font:inherit;border:0;border-radius:12px;padding:16px;width:100%;
+       font-weight:700;cursor:pointer}
+.primary{background:#9C4416;color:#fff;font-size:19px;padding:22px}
+.primary:active{background:#7C340F}
+.send{background:#2E7D32;color:#fff;font-size:18px}
+.send:disabled{background:#BDBDBD}
+.ghost{background:#EDEDED;color:#333;font-size:15px;padding:12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px}
+.thumb{position:relative;aspect-ratio:3/4;border-radius:10px;overflow:hidden;
+       border:1px solid #DDD;background:#FAFAFA}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.thumb b{position:absolute;left:4px;top:4px;background:rgba(0,0,0,.6);color:#fff;
+         font-size:11px;border-radius:6px;padding:1px 6px}
+.thumb span{position:absolute;right:4px;top:4px;background:#C62828;color:#fff;
+            width:26px;height:26px;border-radius:50%;display:flex;
+            align-items:center;justify-content:center;font-weight:700}
+input[type=text]{width:100%;padding:14px;border:1px solid #CCC;border-radius:10px;
+                 font:inherit;background:#fff}
+.msg{padding:12px 14px;border-radius:10px;margin-bottom:14px;font-size:15px}
+.ok{background:#E8F5E9;color:#1B5E20;border:1px solid #A5D6A7}
+.err{background:#FDECEA;color:#B00020;border:1px solid #F5C6C2}
+.info{background:#FFF7E6;color:#5A4300;border:1px solid #F0D9A0}
+.hint{color:#777;font-size:13px;margin:10px 2px 0}
+#file{display:none}
+</style>
+</head>
+<body>
+<header><span>📷</span><div>ADS-SETUP · Depenses<small id="sub">Photographiez la facture</small></div></header>
+<main>
+  <div id="msg"></div>
+
+  <div class="card">
+    <button class="primary" id="shoot">📷 Ajouter une page</button>
+    <p class="hint" id="cnt">Aucune page.</p>
+    <div class="grid" id="pages"></div>
+  </div>
+
+  <div class="card">
+    <input type="text" id="note" placeholder="Note (fournisseur, chantier…)" maxlength="120">
+    <p class="hint">Optionnel. La note arrive telle quelle dans le programme.</p>
+  </div>
+
+  <button class="send" id="send" disabled>✅ Envoyer au programme</button>
+  <p class="hint" id="queue"></p>
+  <button class="ghost" id="retry" style="display:none;margin-top:10px">↻ Renvoyer ce qui attend</button>
+</main>
+<input type="file" id="file" accept="image/*" capture="environment" multiple>
+
+<script>
+var API = "https://tuhikfycnececxxzewwv.supabase.co/functions/v1/gastos";
+var LS_TOKEN = "ads_token", LS_QUEUE = "ads_queue";
+
+function qs(n){ return new URLSearchParams(location.search).get(n); }
+function token(){
+  var t = qs("t");
+  if (t) { try { localStorage.setItem(LS_TOKEN, t); } catch(e){} return t; }
+  try { return localStorage.getItem(LS_TOKEN) || ""; } catch(e){ return ""; }
+}
+function show(kind, text){
+  document.getElementById("msg").innerHTML =
+    '<div class="msg ' + kind + '">' + text + '</div>';
+}
+function post(payload){
+  return fetch(API, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  }).then(function(r){ return r.json(); });
+}
+
+// ---- paginas capturadas (en memoria) ----
+var pages = [];
+
+function render(){
+  var g = document.getElementById("pages");
+  g.innerHTML = "";
+  pages.forEach(function(p, i){
+    var d = document.createElement("div");
+    d.className = "thumb";
+    d.innerHTML = '<img src="' + p.url + '"><b>' + (i+1) + '</b><span>&times;</span>';
+    d.querySelector("span").onclick = function(){ pages.splice(i,1); render(); };
+    g.appendChild(d);
+  });
+  document.getElementById("cnt").textContent =
+    pages.length ? (pages.length + " page(s) prete(s) a envoyer.") : "Aucune page.";
+  document.getElementById("send").disabled = pages.length === 0;
+}
+
+// reduce la foto antes de mandarla (menos datos moviles, misma legibilidad)
+function shrink(file){
+  return new Promise(function(resolve){
+    var img = new Image();
+    img.onload = function(){
+      var max = 1600, w = img.width, h = img.height;
+      if (w > h && w > max) { h = Math.round(h * max / w); w = max; }
+      else if (h >= w && h > max) { w = Math.round(w * max / h); h = max; }
+      var c = document.createElement("canvas");
+      c.width = w; c.height = h;
+      c.getContext("2d").drawImage(img, 0, 0, w, h);
+      var url = c.toDataURL("image/jpeg", 0.8);
+      resolve({ url: url, b64: url.split(",")[1] });
+    };
+    img.onerror = function(){ resolve(null); };
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+document.getElementById("shoot").onclick = function(){
+  document.getElementById("file").click();
+};
+document.getElementById("file").onchange = function(ev){
+  var files = Array.prototype.slice.call(ev.target.files || []);
+  var jobs = files.slice(0, 12).map(shrink);
+  Promise.all(jobs).then(function(res){
+    res.forEach(function(p){ if (p) pages.push(p); });
+    ev.target.value = "";
+    render();
+  });
+};
+
+// ---- cola: lo que no se pudo enviar se guarda y se reintenta ----
+function loadQueue(){
+  try { return JSON.parse(localStorage.getItem(LS_QUEUE) || "[]"); }
+  catch(e){ return []; }
+}
+function saveQueue(q){
+  try { localStorage.setItem(LS_QUEUE, JSON.stringify(q)); } catch(e){}
+  var n = q.length;
+  document.getElementById("queue").textContent =
+    n ? (n + " envoi(s) en attente de reseau.") : "";
+  document.getElementById("retry").style.display = n ? "block" : "none";
+}
+function sendBatch(item){
+  var t = token();
+  var jobs = item.pages.map(function(b64, i){
+    return post({ action: "upload", token: t, batch: item.batch,
+                  page: i + 1, pages: item.pages.length, note: item.note,
+                  filename: "gasto_" + (i+1) + ".jpg", mime: "image/jpeg",
+                  content: b64 });
+  });
+  return Promise.all(jobs).then(function(rs){
+    return rs.every(function(r){ return r && r.ok; });
+  });
+}
+function flushOne(){
+  var q = loadQueue();
+  if (!q.length) return Promise.resolve();
+  return sendBatch(q[0]).then(function(ok){
+    if (ok) { var q2 = loadQueue(); q2.shift(); saveQueue(q2); return flushOne(); }
+  }).catch(function(){});
+}
+// cerrojo: si ya se esta vaciando la cola no se empieza otra vez, o el mismo
+// documento se subiria dos veces (al abrir la app y al volver la red a la vez)
+var flushing = false;
+function flush(){
+  if (flushing) return Promise.resolve();
+  flushing = true;
+  var done = function(){ flushing = false; };
+  return flushOne().then(done, done);
+}
+
+document.getElementById("send").onclick = function(){
+  if (!pages.length) return;
+  var btn = this;
+  btn.disabled = true; btn.textContent = "Envoi…";
+  var item = {
+    batch: (Date.now() + "-" + Math.random().toString(36).slice(2, 8)),
+    note: document.getElementById("note").value || "",
+    pages: pages.map(function(p){ return p.b64; })
+  };
+  sendBatch(item).then(function(ok){
+    if (ok) {
+      show("ok", "✅ Envoye. La depense apparait deja dans le programme.");
+      pages = []; document.getElementById("note").value = ""; render();
+    } else {
+      var q = loadQueue(); q.push(item); saveQueue(q);
+      show("info", "Pas de reseau : l'envoi est garde et partira tout seul.");
+      pages = []; render();
+    }
+  }).catch(function(){
+    var q = loadQueue(); q.push(item); saveQueue(q);
+    show("info", "Pas de reseau : l'envoi est garde et partira tout seul.");
+    pages = []; render();
+  }).then(function(){
+    btn.disabled = pages.length === 0;
+    btn.textContent = "✅ Envoyer au programme";
+  });
+};
+document.getElementById("retry").onclick = function(){ flush(); };
+window.addEventListener("online", flush);
+
+// ---- arranque ----
+(function(){
+  var t = token();
+  if (!t) {
+    show("err", "Ce lien n'est pas valide. Scannez a nouveau le code QR " +
+                "depuis le programme (onglet Depenses → Mobile).");
+    document.getElementById("shoot").disabled = true;
+    return;
+  }
+  if (qs("t")) history.replaceState({}, "", location.pathname);
+  post({ action: "hello", token: t }).then(function(r){
+    if (!r || !r.ok) {
+      show("err", "Appareil non appaire. Rescannez le code QR du programme.");
+    } else {
+      document.getElementById("sub").textContent = "Connecte au programme";
+    }
+  }).catch(function(){});
+  render(); saveQueue(loadQueue()); flush();
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("sw.js")
+      .catch(function(){});
+  }
+})();
+</script>
+</body>
+</html>

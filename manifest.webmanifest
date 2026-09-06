@@ -1,0 +1,18 @@
+{
+  "name": "ADS-SETUP · Dépenses",
+  "short_name": "Dépenses",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F4F4F4",
+  "theme_color": "#9C4416",
+  "icons": [
+    {
+      "src": "icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
