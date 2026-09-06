@@ -2,23 +2,27 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>ADS Depenses</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>ADS SCAN</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="ADS Depenses">
+<meta name="apple-mobile-web-app-title" content="ADS SCAN">
 <meta name="theme-color" content="#9C4416">
 <style>
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{margin:0;font:16px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
      background:#F4F4F4;color:#1A1A1A;
      padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
-header{background:#9C4416;color:#fff;padding:16px;font-weight:700;font-size:18px;
-       display:flex;align-items:center;gap:10px}
-header small{font-weight:400;opacity:.85;font-size:12px;display:block}
+header{background:#9C4416;color:#fff;padding:14px 16px;display:flex;
+       align-items:center;gap:12px}
+header .brand{font-weight:800;font-size:19px;letter-spacing:.5px;line-height:1.1}
+header .sub{font-weight:400;opacity:.85;font-size:12px;display:block;letter-spacing:0}
+header select{margin-left:auto;background:rgba(255,255,255,.15);color:#fff;border:0;
+              border-radius:8px;padding:8px 10px;font:inherit;font-size:14px}
+header select option{color:#1A1A1A}
 main{padding:16px;max-width:640px;margin:0 auto}
 .card{background:#fff;border-radius:14px;padding:16px;margin-bottom:14px;
       box-shadow:0 1px 3px rgba(0,0,0,.12)}
@@ -28,7 +32,7 @@ button{font:inherit;border:0;border-radius:12px;padding:16px;width:100%;
 .primary:active{background:#7C340F}
 .send{background:#2E7D32;color:#fff;font-size:18px}
 .send:disabled{background:#BDBDBD}
-.ghost{background:#EDEDED;color:#333;font-size:15px;padding:12px}
+.ghost{background:#EDEDED;color:#333;font-size:15px;padding:12px;margin-top:10px}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px}
 .thumb{position:relative;aspect-ratio:3/4;border-radius:10px;overflow:hidden;
        border:1px solid #DDD;background:#FAFAFA}
@@ -46,38 +50,220 @@ input[type=text]{width:100%;padding:14px;border:1px solid #CCC;border-radius:10p
 .info{background:#FFF7E6;color:#5A4300;border:1px solid #F0D9A0}
 .hint{color:#777;font-size:13px;margin:10px 2px 0}
 #file{display:none}
+
+/* ---------------- escaner con recuadro ---------------- */
+#cam{position:fixed;inset:0;background:#000;z-index:50;display:none}
+#cam video{width:100%;height:100%;object-fit:cover;display:block}
+/* el marco: el hueco transparente lo hace la sombra gigante de alrededor */
+#frame{position:absolute;border:2px solid #fff;border-radius:12px;
+       box-shadow:0 0 0 100vmax rgba(0,0,0,.55);pointer-events:none}
+#frame i{position:absolute;width:26px;height:26px;border:4px solid #C8971B}
+#frame i:nth-child(1){left:-3px;top:-3px;border-right:0;border-bottom:0;border-radius:10px 0 0 0}
+#frame i:nth-child(2){right:-3px;top:-3px;border-left:0;border-bottom:0;border-radius:0 10px 0 0}
+#frame i:nth-child(3){left:-3px;bottom:-3px;border-right:0;border-top:0;border-radius:0 0 0 10px}
+#frame i:nth-child(4){right:-3px;bottom:-3px;border-left:0;border-top:0;border-radius:0 0 10px 0}
+#camtip{position:absolute;left:0;right:0;top:calc(env(safe-area-inset-top) + 14px);
+        text-align:center;color:#fff;font-size:15px;text-shadow:0 1px 4px #000;
+        padding:0 20px;pointer-events:none}
+#cambar{position:absolute;left:0;right:0;bottom:0;
+        padding:18px 20px calc(env(safe-area-inset-bottom) + 22px);
+        display:flex;align-items:center;justify-content:space-between;gap:16px}
+#cambar button{width:auto;background:rgba(255,255,255,.18);color:#fff;
+               padding:12px 16px;font-size:15px;border-radius:10px;backdrop-filter:blur(4px)}
+#shoot{width:76px;height:76px;border-radius:50%;background:#fff;border:5px solid rgba(255,255,255,.45);
+       padding:0;flex:0 0 auto}
+#shots{position:absolute;right:20px;top:calc(env(safe-area-inset-top) + 52px);
+       background:#9C4416;color:#fff;border-radius:20px;padding:4px 12px;
+       font-weight:700;font-size:14px;display:none}
 </style>
 </head>
 <body>
-<header><span>📷</span><div>ADS-SETUP · Depenses<small id="sub">Photographiez la facture</small></div></header>
+
+<header>
+  <span style="font-size:26px">📷</span>
+  <div class="brand">ADS SCAN<span class="sub" id="sub"></span></div>
+  <select id="lang" aria-label="idioma"></select>
+</header>
+
 <main>
   <div id="msg"></div>
 
   <div class="card">
-    <button class="primary" id="shoot">📷 Ajouter une page</button>
-    <p class="hint" id="cnt">Aucune page.</p>
+    <button class="primary" id="scan"></button>
+    <button class="ghost" id="pick"></button>
+    <p class="hint" id="cnt"></p>
     <div class="grid" id="pages"></div>
   </div>
 
   <div class="card">
-    <input type="text" id="note" placeholder="Note (fournisseur, chantier…)" maxlength="120">
-    <p class="hint">Optionnel. La note arrive telle quelle dans le programme.</p>
+    <input type="text" id="note" maxlength="120">
+    <p class="hint" id="notehint"></p>
   </div>
 
-  <button class="send" id="send" disabled>✅ Envoyer au programme</button>
+  <button class="send" id="send" disabled></button>
   <p class="hint" id="queue"></p>
-  <button class="ghost" id="retry" style="display:none;margin-top:10px">↻ Renvoyer ce qui attend</button>
+  <button class="ghost" id="retry" style="display:none"></button>
 </main>
-<input type="file" id="file" accept="image/*" capture="environment" multiple>
+
+<input type="file" id="file" accept="image/*" multiple>
+
+<!-- escáner a pantalla completa -->
+<div id="cam">
+  <video id="video" playsinline muted autoplay></video>
+  <div id="frame"><i></i><i></i><i></i><i></i></div>
+  <div id="camtip"></div>
+  <div id="shots"></div>
+  <div id="cambar">
+    <button id="camclose"></button>
+    <button id="shoot" aria-label="capturar"></button>
+    <button id="camtorch">💡</button>
+  </div>
+</div>
 
 <script>
+/* =====================================================================
+   ADS SCAN — app móvil de gastos de ADS-SETUP 2.0
+   La API (Edge Function de Supabase) recibe las páginas escaneadas.
+   ===================================================================== */
 var API = "https://tuhikfycnececxxzewwv.supabase.co/functions/v1/gastos";
-var LS_TOKEN = "ads_token", LS_QUEUE = "ads_queue";
+var LS_TOKEN = "ads_token", LS_QUEUE = "ads_queue", LS_LANG = "ads_lang";
 
+/* ------------------------------- idiomas ------------------------------- */
+var LANGS = { es:"Español", fr:"Français", de:"Deutsch",
+              it:"Italiano", pt:"Português", en:"English" };
+
+var T = {
+  sub:        { es:"Fotografía la factura", fr:"Photographiez la facture",
+                de:"Rechnung fotografieren", it:"Fotografa la fattura",
+                pt:"Fotografe a fatura", en:"Photograph the invoice" },
+  connected:  { es:"Conectado al programa", fr:"Connecté au programme",
+                de:"Mit dem Programm verbunden", it:"Collegato al programma",
+                pt:"Ligado ao programa", en:"Connected to the program" },
+  scan:       { es:"📷 Escanear documento", fr:"📷 Scanner un document",
+                de:"📷 Dokument scannen", it:"📷 Scansiona documento",
+                pt:"📷 Digitalizar documento", en:"📷 Scan a document" },
+  pick:       { es:"Usar la cámara del teléfono", fr:"Utiliser l'appareil photo du téléphone",
+                de:"Handykamera verwenden", it:"Usa la fotocamera del telefono",
+                pt:"Usar a câmara do telemóvel", en:"Use the phone camera" },
+  none:       { es:"Ninguna página todavía.", fr:"Aucune page pour l'instant.",
+                de:"Noch keine Seite.", it:"Ancora nessuna pagina.",
+                pt:"Ainda nenhuma página.", en:"No pages yet." },
+  ready:      { es:"{n} página(s) listas para enviar.", fr:"{n} page(s) prêtes à envoyer.",
+                de:"{n} Seite(n) bereit zum Senden.", it:"{n} pagina/e pronte da inviare.",
+                pt:"{n} página(s) prontas a enviar.", en:"{n} page(s) ready to send." },
+  note:       { es:"Nota (proveedor, obra…)", fr:"Note (fournisseur, chantier…)",
+                de:"Notiz (Lieferant, Baustelle…)", it:"Nota (fornitore, cantiere…)",
+                pt:"Nota (fornecedor, obra…)", en:"Note (supplier, site…)" },
+  notehint:   { es:"Opcional. La nota llega tal cual al programa.",
+                fr:"Optionnel. La note arrive telle quelle dans le programme.",
+                de:"Optional. Die Notiz kommt unverändert im Programm an.",
+                it:"Facoltativo. La nota arriva così com'è nel programma.",
+                pt:"Opcional. A nota chega tal e qual ao programa.",
+                en:"Optional. The note arrives as-is in the program." },
+  send:       { es:"✅ Enviar al programa", fr:"✅ Envoyer au programme",
+                de:"✅ An das Programm senden", it:"✅ Invia al programma",
+                pt:"✅ Enviar ao programa", en:"✅ Send to the program" },
+  sending:    { es:"Enviando…", fr:"Envoi…", de:"Wird gesendet…",
+                it:"Invio…", pt:"A enviar…", en:"Sending…" },
+  sent:       { es:"✅ Enviado. El gasto ya aparece en el programa.",
+                fr:"✅ Envoyé. La dépense apparaît déjà dans le programme.",
+                de:"✅ Gesendet. Die Ausgabe erscheint bereits im Programm.",
+                it:"✅ Inviato. La spesa compare già nel programma.",
+                pt:"✅ Enviado. A despesa já aparece no programa.",
+                en:"✅ Sent. The expense already shows in the program." },
+  offline:    { es:"Sin conexión: el envío queda guardado y saldrá solo.",
+                fr:"Pas de réseau : l'envoi est gardé et partira tout seul.",
+                de:"Kein Netz: Der Versand wird gespeichert und geht automatisch raus.",
+                it:"Nessuna rete: l'invio resta salvato e partirà da solo.",
+                pt:"Sem rede: o envio fica guardado e sairá sozinho.",
+                en:"No network: the upload is saved and will go on its own." },
+  queued:     { es:"{n} envío(s) esperando red.", fr:"{n} envoi(s) en attente de réseau.",
+                de:"{n} Sendung(en) warten auf Netz.", it:"{n} invio/i in attesa di rete.",
+                pt:"{n} envio(s) à espera de rede.", en:"{n} upload(s) waiting for network." },
+  retry:      { es:"↻ Reenviar lo que espera", fr:"↻ Renvoyer ce qui attend",
+                de:"↻ Wartendes erneut senden", it:"↻ Rinvia ciò che attende",
+                pt:"↻ Reenviar o que espera", en:"↻ Resend what is waiting" },
+  badlink:    { es:"Este enlace no es válido. Vuelve a escanear el código QR desde el programa (pestaña Gastos → Móvil).",
+                fr:"Ce lien n'est pas valide. Rescannez le code QR depuis le programme (onglet Dépenses → Mobile).",
+                de:"Dieser Link ist ungültig. Scannen Sie den QR-Code im Programm erneut (Register Ausgaben → Handy).",
+                it:"Questo link non è valido. Riscansiona il codice QR dal programma (scheda Spese → Cellulare).",
+                pt:"Esta ligação não é válida. Volte a digitalizar o código QR no programa (separador Despesas → Telemóvel).",
+                en:"This link is not valid. Scan the QR code again from the program (Expenses tab → Phone)." },
+  unpaired:   { es:"Dispositivo no vinculado. Vuelve a escanear el código QR del programa.",
+                fr:"Appareil non appairé. Rescannez le code QR du programme.",
+                de:"Gerät nicht verbunden. Scannen Sie den QR-Code des Programms erneut.",
+                it:"Dispositivo non collegato. Riscansiona il codice QR del programma.",
+                pt:"Dispositivo não associado. Volte a digitalizar o código QR do programa.",
+                en:"Device not paired. Scan the program's QR code again." },
+  camtip:     { es:"Encaja la factura dentro del marco",
+                fr:"Placez la facture dans le cadre",
+                de:"Rechnung in den Rahmen legen",
+                it:"Inquadra la fattura nel riquadro",
+                pt:"Encaixe a fatura dentro do quadro",
+                en:"Fit the invoice inside the frame" },
+  camdone:    { es:"Listo", fr:"Terminé", de:"Fertig", it:"Fatto",
+                pt:"Pronto", en:"Done" },
+  camfail:    { es:"No se pudo abrir la cámara. Usa la cámara del teléfono.",
+                fr:"Impossible d'ouvrir l'appareil photo. Utilisez celui du téléphone.",
+                de:"Kamera konnte nicht geöffnet werden. Handykamera verwenden.",
+                it:"Impossibile aprire la fotocamera. Usa quella del telefono.",
+                pt:"Não foi possível abrir a câmara. Use a câmara do telemóvel.",
+                en:"Could not open the camera. Use the phone camera." },
+  shots:      { es:"{n} capturadas", fr:"{n} prises", de:"{n} erfasst",
+                it:"{n} scattate", pt:"{n} captadas", en:"{n} captured" }
+};
+
+function lang(){
+  var q = new URLSearchParams(location.search).get("lang");
+  if (q && LANGS[q]) { try { localStorage.setItem(LS_LANG, q); } catch(e){} return q; }
+  var saved = null;
+  try { saved = localStorage.getItem(LS_LANG); } catch(e){}
+  if (saved && LANGS[saved]) return saved;
+  var nav = (navigator.language || "fr").slice(0,2).toLowerCase();
+  return LANGS[nav] ? nav : "fr";
+}
+var LG = lang();
+function t(key, vars){
+  var e = T[key] || {};
+  var s = e[LG] || e.fr || e.es || key;
+  if (vars) for (var k in vars) s = s.replace("{" + k + "}", vars[k]);
+  return s;
+}
+function applyLang(){
+  document.documentElement.lang = LG;
+  document.getElementById("sub").textContent = subOverride || t("sub");
+  document.getElementById("scan").textContent = t("scan");
+  document.getElementById("pick").textContent = t("pick");
+  document.getElementById("note").placeholder = t("note");
+  document.getElementById("notehint").textContent = t("notehint");
+  document.getElementById("send").textContent = t("send");
+  document.getElementById("retry").textContent = t("retry");
+  document.getElementById("camtip").textContent = t("camtip");
+  document.getElementById("camclose").textContent = t("camdone");
+  render(); saveQueue(loadQueue());
+}
+var subOverride = "";
+
+(function initLangSelect(){
+  var sel = document.getElementById("lang");
+  for (var k in LANGS) {
+    var o = document.createElement("option");
+    o.value = k; o.textContent = LANGS[k];
+    if (k === LG) o.selected = true;
+    sel.appendChild(o);
+  }
+  sel.onchange = function(){
+    LG = this.value;
+    try { localStorage.setItem(LS_LANG, LG); } catch(e){}
+    applyLang();
+  };
+})();
+
+/* ------------------------------- utilidades ---------------------------- */
 function qs(n){ return new URLSearchParams(location.search).get(n); }
 function token(){
-  var t = qs("t");
-  if (t) { try { localStorage.setItem(LS_TOKEN, t); } catch(e){} return t; }
+  var tk = qs("t");
+  if (tk) { try { localStorage.setItem(LS_TOKEN, tk); } catch(e){} return tk; }
   try { return localStorage.getItem(LS_TOKEN) || ""; } catch(e){ return ""; }
 }
 function show(kind, text){
@@ -85,14 +271,11 @@ function show(kind, text){
     '<div class="msg ' + kind + '">' + text + '</div>';
 }
 function post(payload){
-  return fetch(API, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
-  }).then(function(r){ return r.json(); });
+  return fetch(API, { method:"POST", headers:{"Content-Type":"application/json"},
+                      body: JSON.stringify(payload) }).then(function(r){ return r.json(); });
 }
 
-// ---- paginas capturadas (en memoria) ----
+/* --------------------------- páginas capturadas ------------------------ */
 var pages = [];
 
 function render(){
@@ -106,65 +289,174 @@ function render(){
     g.appendChild(d);
   });
   document.getElementById("cnt").textContent =
-    pages.length ? (pages.length + " page(s) prete(s) a envoyer.") : "Aucune page.";
+    pages.length ? t("ready", {n: pages.length}) : t("none");
   document.getElementById("send").disabled = pages.length === 0;
+  var s = document.getElementById("shots");
+  s.textContent = t("shots", {n: pages.length});
+  s.style.display = pages.length ? "block" : "none";
 }
 
-// reduce la foto antes de mandarla (menos datos moviles, misma legibilidad)
-function shrink(file){
+/* Reduce la imagen: menos datos móviles y misma legibilidad para el OCR. */
+function shrinkCanvas(canvas){
+  var max = 1600, w = canvas.width, h = canvas.height;
+  if (Math.max(w,h) > max) {
+    var k = max / Math.max(w,h);
+    var c2 = document.createElement("canvas");
+    c2.width = Math.round(w*k); c2.height = Math.round(h*k);
+    c2.getContext("2d").drawImage(canvas, 0, 0, c2.width, c2.height);
+    canvas = c2;
+  }
+  var url = canvas.toDataURL("image/jpeg", 0.85);
+  return { url: url, b64: url.split(",")[1] };
+}
+function shrinkFile(file){
   return new Promise(function(resolve){
     var img = new Image();
     img.onload = function(){
-      var max = 1600, w = img.width, h = img.height;
-      if (w > h && w > max) { h = Math.round(h * max / w); w = max; }
-      else if (h >= w && h > max) { w = Math.round(w * max / h); h = max; }
       var c = document.createElement("canvas");
-      c.width = w; c.height = h;
-      c.getContext("2d").drawImage(img, 0, 0, w, h);
-      var url = c.toDataURL("image/jpeg", 0.8);
-      resolve({ url: url, b64: url.split(",")[1] });
+      c.width = img.width; c.height = img.height;
+      c.getContext("2d").drawImage(img, 0, 0);
+      resolve(shrinkCanvas(c));
     };
     img.onerror = function(){ resolve(null); };
     img.src = URL.createObjectURL(file);
   });
 }
 
-document.getElementById("shoot").onclick = function(){
+/* ---------------------- escáner con recuadro de guía -------------------- */
+var stream = null, track = null;
+
+function videoBox(){
+  /* Tamaño en pantalla del vídeo. UNA sola función para que el marco que se
+     dibuja y el recorte que se hace usen exactamente la misma medida. */
+  var v = document.getElementById("video");
+  return { w: v.clientWidth || v.offsetWidth || window.innerWidth,
+           h: v.clientHeight || v.offsetHeight || window.innerHeight };
+}
+
+function frameRect(){
+  /* El marco ocupa el 88% del ancho, con proporción A4 vertical, centrado
+     y algo por encima del centro para dejar sitio a los botones. */
+  var b = videoBox();
+  var W = b.w, H = b.h;
+  var w = W * 0.88, h = w * 1.414;
+  if (h > H * 0.66) { h = H * 0.66; w = h / 1.414; }
+  return { x: (W - w) / 2, y: (H - h) / 2 - H * 0.05, w: w, h: h };
+}
+function placeFrame(){
+  var r = frameRect(), f = document.getElementById("frame");
+  f.style.left = r.x + "px"; f.style.top = r.y + "px";
+  f.style.width = r.w + "px"; f.style.height = r.h + "px";
+}
+window.addEventListener("resize", function(){
+  if (document.getElementById("cam").style.display === "block") placeFrame();
+});
+
+function openCam(){
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    show("info", t("camfail")); return;
+  }
+  navigator.mediaDevices.getUserMedia({
+    audio: false,
+    video: { facingMode: { ideal: "environment" },
+             width: { ideal: 2560 }, height: { ideal: 1440 } }
+  }).then(function(st){
+    stream = st; track = st.getVideoTracks()[0];
+    var v = document.getElementById("video");
+    v.srcObject = st;
+    document.getElementById("cam").style.display = "block";
+    placeFrame();
+    // la linterna solo si el teléfono la ofrece
+    var caps = track.getCapabilities ? track.getCapabilities() : {};
+    document.getElementById("camtorch").style.display = caps.torch ? "block" : "none";
+  }).catch(function(){
+    show("info", t("camfail"));
+  });
+}
+
+function closeCam(){
+  document.getElementById("cam").style.display = "none";
+  if (stream) { stream.getTracks().forEach(function(x){ x.stop(); }); }
+  stream = null; track = null;
+}
+
+/* Recorta lo que hay DENTRO del marco. El vídeo se pinta con object-fit:
+   cover, así que hay que deshacer ese recorte para saber qué píxeles del
+   fotograma original corresponden al marco. */
+function capture(){
+  var v = document.getElementById("video");
+  var vw = v.videoWidth, vh = v.videoHeight;
+  if (!vw || !vh) return;
+  var b = videoBox();
+  var dw = b.w, dh = b.h;
+  if (!dw || !dh) return;
+  var scale = Math.max(dw / vw, dh / vh);
+  if (!(scale > 0)) return;
+  var ox = (vw * scale - dw) / 2, oy = (vh * scale - dh) / 2;
+  var r = frameRect();
+  var sx = (r.x + ox) / scale, sy = (r.y + oy) / scale;
+  var sw = r.w / scale, sh = r.h / scale;
+  sx = Math.max(0, Math.min(sx, vw)); sy = Math.max(0, Math.min(sy, vh));
+  sw = Math.min(sw, vw - sx);         sh = Math.min(sh, vh - sy);
+
+  // nunca añadir una página vacía: mejor no capturar que enviar un folio
+  // en blanco al programa
+  if (!(sw > 8 && sh > 8)) return;
+
+  var c = document.createElement("canvas");
+  c.width = Math.round(sw); c.height = Math.round(sh);
+  c.getContext("2d").drawImage(v, sx, sy, sw, sh, 0, 0, c.width, c.height);
+  pages.push(shrinkCanvas(c));
+  render();
+  // aviso visual de que ha disparado
+  var f = document.getElementById("frame");
+  f.style.borderColor = "#C8971B";
+  setTimeout(function(){ f.style.borderColor = "#fff"; }, 180);
+}
+
+document.getElementById("scan").onclick = openCam;
+document.getElementById("camclose").onclick = closeCam;
+document.getElementById("shoot").onclick = capture;
+document.getElementById("camtorch").onclick = function(){
+  if (!track) return;
+  var on = this.dataset.on === "1";
+  track.applyConstraints({ advanced: [{ torch: !on }] })
+       .then(function(){}).catch(function(){});
+  this.dataset.on = on ? "0" : "1";
+  this.style.background = on ? "rgba(255,255,255,.18)" : "rgba(200,151,27,.85)";
+};
+
+/* Camino alternativo: la cámara/galería del propio teléfono. */
+document.getElementById("pick").onclick = function(){
   document.getElementById("file").click();
 };
 document.getElementById("file").onchange = function(ev){
   var files = Array.prototype.slice.call(ev.target.files || []);
-  var jobs = files.slice(0, 12).map(shrink);
-  Promise.all(jobs).then(function(res){
+  Promise.all(files.slice(0, 12).map(shrinkFile)).then(function(res){
     res.forEach(function(p){ if (p) pages.push(p); });
     ev.target.value = "";
     render();
   });
 };
 
-// ---- cola: lo que no se pudo enviar se guarda y se reintenta ----
+/* --------- cola: lo que no se pudo enviar se guarda y se reintenta ------ */
 function loadQueue(){
   try { return JSON.parse(localStorage.getItem(LS_QUEUE) || "[]"); }
   catch(e){ return []; }
 }
 function saveQueue(q){
   try { localStorage.setItem(LS_QUEUE, JSON.stringify(q)); } catch(e){}
-  var n = q.length;
-  document.getElementById("queue").textContent =
-    n ? (n + " envoi(s) en attente de reseau.") : "";
-  document.getElementById("retry").style.display = n ? "block" : "none";
+  document.getElementById("queue").textContent = q.length ? t("queued", {n:q.length}) : "";
+  document.getElementById("retry").style.display = q.length ? "block" : "none";
 }
 function sendBatch(item){
-  var t = token();
-  var jobs = item.pages.map(function(b64, i){
-    return post({ action: "upload", token: t, batch: item.batch,
-                  page: i + 1, pages: item.pages.length, note: item.note,
-                  filename: "gasto_" + (i+1) + ".jpg", mime: "image/jpeg",
-                  content: b64 });
-  });
-  return Promise.all(jobs).then(function(rs){
-    return rs.every(function(r){ return r && r.ok; });
-  });
+  var tk = token();
+  return Promise.all(item.pages.map(function(b64, i){
+    return post({ action:"upload", token:tk, batch:item.batch,
+                  page:i+1, pages:item.pages.length, note:item.note,
+                  filename:"gasto_" + (i+1) + ".jpg", mime:"image/jpeg",
+                  content:b64 });
+  })).then(function(rs){ return rs.every(function(r){ return r && r.ok; }); });
 }
 function flushOne(){
   var q = loadQueue();
@@ -173,8 +465,8 @@ function flushOne(){
     if (ok) { var q2 = loadQueue(); q2.shift(); saveQueue(q2); return flushOne(); }
   }).catch(function(){});
 }
-// cerrojo: si ya se esta vaciando la cola no se empieza otra vez, o el mismo
-// documento se subiria dos veces (al abrir la app y al volver la red a la vez)
+// cerrojo: sin él, el mismo documento podía subirse dos veces (al abrir la
+// app y al volver la red a la vez)
 var flushing = false;
 function flush(){
   if (flushing) return Promise.resolve();
@@ -186,54 +478,51 @@ function flush(){
 document.getElementById("send").onclick = function(){
   if (!pages.length) return;
   var btn = this;
-  btn.disabled = true; btn.textContent = "Envoi…";
-  var item = {
-    batch: (Date.now() + "-" + Math.random().toString(36).slice(2, 8)),
-    note: document.getElementById("note").value || "",
-    pages: pages.map(function(p){ return p.b64; })
+  btn.disabled = true; btn.textContent = t("sending");
+  var item = { batch: Date.now() + "-" + Math.random().toString(36).slice(2,8),
+               note: document.getElementById("note").value || "",
+               pages: pages.map(function(p){ return p.b64; }) };
+  var guardar = function(){
+    var q = loadQueue(); q.push(item); saveQueue(q);
+    show("info", t("offline"));
+    pages = []; render();
   };
   sendBatch(item).then(function(ok){
     if (ok) {
-      show("ok", "✅ Envoye. La depense apparait deja dans le programme.");
+      show("ok", t("sent"));
       pages = []; document.getElementById("note").value = ""; render();
-    } else {
-      var q = loadQueue(); q.push(item); saveQueue(q);
-      show("info", "Pas de reseau : l'envoi est garde et partira tout seul.");
-      pages = []; render();
-    }
-  }).catch(function(){
-    var q = loadQueue(); q.push(item); saveQueue(q);
-    show("info", "Pas de reseau : l'envoi est garde et partira tout seul.");
-    pages = []; render();
-  }).then(function(){
+    } else { guardar(); }
+  }).catch(guardar).then(function(){
     btn.disabled = pages.length === 0;
-    btn.textContent = "✅ Envoyer au programme";
+    btn.textContent = t("send");
   });
 };
 document.getElementById("retry").onclick = function(){ flush(); };
 window.addEventListener("online", flush);
 
-// ---- arranque ----
+/* ------------------------------- arranque ------------------------------ */
 (function(){
-  var t = token();
-  if (!t) {
-    show("err", "Ce lien n'est pas valide. Scannez a nouveau le code QR " +
-                "depuis le programme (onglet Depenses → Mobile).");
-    document.getElementById("shoot").disabled = true;
+  applyLang();
+  var tk = token();
+  if (!tk) {
+    show("err", t("badlink"));
+    document.getElementById("scan").disabled = true;
+    document.getElementById("pick").disabled = true;
     return;
   }
-  if (qs("t")) history.replaceState({}, "", location.pathname);
-  post({ action: "hello", token: t }).then(function(r){
+  if (qs("t") || qs("lang")) history.replaceState({}, "", location.pathname);
+  post({ action:"hello", token:tk }).then(function(r){
     if (!r || !r.ok) {
-      show("err", "Appareil non appaire. Rescannez le code QR du programme.");
+      show("err", t("unpaired"));
     } else {
-      document.getElementById("sub").textContent = "Connecte au programme";
+      subOverride = t("connected");
+      document.getElementById("sub").textContent = subOverride;
     }
   }).catch(function(){});
-  render(); saveQueue(loadQueue()); flush();
+  saveQueue(loadQueue());
+  flush();
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("sw.js")
-      .catch(function(){});
+    navigator.serviceWorker.register("sw.js").catch(function(){});
   }
 })();
 </script>

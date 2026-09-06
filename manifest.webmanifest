@@ -1,6 +1,6 @@
 {
-  "name": "ADS-SETUP · Dépenses",
-  "short_name": "Dépenses",
+  "name": "ADS SCAN",
+  "short_name": "ADS SCAN",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
@@ -14,5 +14,6 @@
       "type": "image/png",
       "purpose": "any maskable"
     }
-  ]
+  ],
+  "description": "Escanear facturas y enviarlas a ADS-SETUP 2.0"
 }
